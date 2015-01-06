@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"pingd"
+	"github.com/pinggg/pingd"
 )
 
 // Mailer is a function which takes a email

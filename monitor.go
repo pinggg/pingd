@@ -2,9 +2,10 @@ package pingd
 
 import (
 	"log"
-	"pingd/ping"
 	"sync"
 	"time"
+
+	"github.com/pinggg/pingd/ping"
 )
 
 var pingFunc = ping.Ping // ping function

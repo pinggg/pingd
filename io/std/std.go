@@ -3,7 +3,7 @@ package std
 import (
 	"log"
 
-	"pingd"
+	"github.com/pinggg/pingd"
 )
 
 // NewLoaderFunc gets the sequence of hostnames/IPs and returns a Loader
