@@ -57,10 +57,8 @@ func main() {
 func sendMail(recipient, message string) {
 	e := email.NewEmail()
 
-	// Set from to something appropriate
-	server, _ := os.Hostname()
-	e.From = "ping@" + server
-
+	// Change From to something more appropriate
+	e.From = recipient
 	e.To = []string{recipient}
 	e.Subject = message
 
