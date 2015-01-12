@@ -42,6 +42,8 @@ curl localhost:7700/4.4.2.2
 curl -XDELETE localhost:7700/8.8.4.4
 ```
 
+Keep in mind that this is just an example which assumes that there is a local mail server running on port 25. Take a look at the [sendMail function](https://github.com/pinggg/pingd/blob/master/examples/httpmail/cmd.go#L55) and adapt it to your needs. For example, to [send the emails via Gmail](https://github.com/jordan-wright/email#sending-email-using-gmail).
+
 https://ping.gg uses in production a configuration like the [redis example](https://github.com/pinggg/pingd/blob/master/examples/redis/cmd.go) allowing the website to interact with pingd via redis pub/sub.
 
 You can add your own functions to have pingd interact with the world. For example, switching on some red light with the help of a Raspberry Pi.
