@@ -33,7 +33,7 @@ export GOPATH=$PWD
 go get github.com/pinggg/pingd/examples/httpmail
 
  # start pinging 8.8.8.8 and 8.8.4.4 and email you if they go down
-sudo bin/httpmain -email=mymail@example.org 8.8.8.8 8.8.4.4
+sudo bin/httpmail -email=mymail@example.org 8.8.8.8 8.8.4.4
 
  # add a new host while running
 curl localhost:7700/4.4.2.2
