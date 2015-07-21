@@ -47,7 +47,10 @@ func (m *Monitor) Start(interval time.Duration, failLimit int) {
 	m.stop = false
 	m.lock.Unlock()
 
-	for _ = range time.NewTicker(interval).C {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for _ = range ticker.C {
 		//		log.Println("tick")
 		m.lock.Lock()
 		if m.stop {
