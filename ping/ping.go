@@ -29,7 +29,7 @@ func Ping(host string) (up bool, err error) {
 	}()
 
 	if os.Geteuid() != 0 {
-		log.Fatal("skipping ping, root perimisisons missing")
+		log.Fatal("skipping ping, root permissions missing")
 	}
 
 	c, err := net.Dial("ip:icmp", host)
