@@ -28,6 +28,7 @@ func main() {
 	flag.Parse()
 
 	var pool = &pingd.Pool{
+		Ping:      ping.Ping,
 		Interval:  interval,
 		FailLimit: failLimit,
 		Receive:   redis.NewReceiverFunc(redisAddr, redisDB),

@@ -68,13 +68,13 @@ func createTestPool(pingseq map[string][]bool, loadseq []string) (start, stop, n
 	stopHostChFW := make(chan Host)
 	notifyChFW := make(chan Host)
 
-	pingFunc = NewTestPingFunc(pingseq)
 	var pool = &Pool{
 		Interval:  time.Millisecond,
 		FailLimit: 2,
 		Receive:   NewTestReceiverFunc(startHostChFW, stopHostChFW),
 		Notify:    NewTestNotifyFunc(notifyChFW),
 		Load:      NewLoaderFunc(loadseq),
+		Ping:      NewTestPingFunc(pingseq),
 	}
 
 	go pool.Start()

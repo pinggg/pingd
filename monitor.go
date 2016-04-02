@@ -4,15 +4,14 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"github.com/pinggg/pingd/ping"
 )
 
-var pingFunc = ping.Ping // ping function
+type PingFunc func(host string) (up bool, err error)
 
 // Monitor is the main structure that represent a monitored host
 // Whenever a host goes up or down it notifies it on the corresponding channel
 type Monitor struct {
+	ping      PingFunc
 	host      Host
 	failures  int
 	failLimit int
@@ -24,8 +23,9 @@ type Monitor struct {
 }
 
 // NewMonitor takes a host, an initial state, and the notification channels and returns a monitorable host structure
-func NewMonitor(host Host, notifyCh chan<- Host) *Monitor {
+func NewMonitor(host Host, ping PingFunc, notifyCh chan<- Host) *Monitor {
 	h := Monitor{
+		ping:     ping,
 		host:     host,
 		notifyCh: notifyCh,
 		running:  &sync.Mutex{},
@@ -58,7 +58,7 @@ func (m *Monitor) Start(interval time.Duration, failLimit int) {
 		}
 		m.lock.Unlock()
 
-		if up, err := pingFunc(m.host.Host); up {
+		if up, err := m.ping(m.host.Host); up {
 			//			log.Println(m.host.Host + " pong")
 			m.markUp()
 		} else {

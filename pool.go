@@ -33,6 +33,7 @@ type Loader func(chan<- Host)
 // being monitored, with the monitoring parameters and the functions
 // interfacing with the rest of the system.
 type Pool struct {
+	Ping      PingFunc
 	Interval  time.Duration
 	FailLimit int
 	Receive   Receiver
@@ -82,7 +83,7 @@ func (p *Pool) run(startHostCh, stopHostCh <-chan Host, notifyCh chan<- Host) {
 				}(p.list[h.Host])
 			} else {
 				log.Println("NEW host " + h.Host)
-				p.list[h.Host] = NewMonitor(h, notifyCh)
+				p.list[h.Host] = NewMonitor(h, p.Ping, notifyCh)
 				go func(h *Monitor) {
 					h.Start(p.Interval, p.FailLimit)
 				}(p.list[h.Host])

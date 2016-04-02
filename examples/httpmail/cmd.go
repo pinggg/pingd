@@ -37,6 +37,7 @@ func main() {
 	hosts := flag.Args()
 
 	var pool = &pingd.Pool{
+		Ping:      ping.Ping,
 		Interval:  interval,
 		FailLimit: failLimit,
 		Receive:   http.NewReceiverFunc(listenAddr),          // start/stop commands via HTTP
