@@ -19,13 +19,13 @@ func TestUpDownStartStop(t *testing.T) {
 	seq["h4"] = []bool{false, false, true, true, false, false, false}
 	load := []string{"h1", "h2"}
 
-	resultSeq := []Host{
-		Host{"h2", true},  // h2 goes down first
-		Host{"h1", true},  // h1 follows
-		Host{"h2", false}, // h2 goes up
-		Host{"h1", false}, // h1 goes up
-		Host{"h1", true},  // h2 goes down
-		Host{"h2", true},  // h1 goes down
+	resultSeq := []HostStatus{
+		HostStatus{"h2", true},  // h2 goes down first
+		HostStatus{"h1", true},  // h1 follows
+		HostStatus{"h2", false}, // h2 goes up
+		HostStatus{"h1", false}, // h1 goes up
+		HostStatus{"h1", true},  // h2 goes down
+		HostStatus{"h2", true},  // h1 goes down
 	}
 
 	startHostChFW, stopHostChFW, notifyChFW := createTestPool(seq, load)
@@ -38,8 +38,8 @@ func TestUpDownStartStop(t *testing.T) {
 		}
 	}
 
-	startHostChFW <- Host{"h3", false} // start h3 as UP
-	startHostChFW <- Host{"h4", true}  // start h4 as DOWN
+	startHostChFW <- HostStatus{"h3", false} // start h3 as UP
+	startHostChFW <- HostStatus{"h4", true}  // start h4 as DOWN
 
 	// Expect h4 to come UP (down=false) first
 	event := <-notifyChFW
@@ -63,10 +63,10 @@ func TestUpDownStartStop(t *testing.T) {
 	time.Sleep(time.Millisecond * 20)
 }
 
-func createTestPool(pingseq map[string][]bool, loadseq []string) (start, stop, notify chan Host) {
-	startHostChFW := make(chan Host)
-	stopHostChFW := make(chan Host)
-	notifyChFW := make(chan Host)
+func createTestPool(pingseq map[string][]bool, loadseq []string) (start, stop, notify chan HostStatus) {
+	startHostChFW := make(chan HostStatus)
+	stopHostChFW := make(chan HostStatus)
+	notifyChFW := make(chan HostStatus)
 
 	var pool = &Pool{
 		Interval:  time.Millisecond,
@@ -109,8 +109,8 @@ func NewTestPingFunc(sequence map[string][]bool) func(string) (bool, error) {
 // NewTestReceiverFunc gets 2 Hosts channel and returns a function that
 // forwards whatever is put into those channels into the system injected
 // start and stop channels
-func NewTestReceiverFunc(startFW, stopFW <-chan Host) Receiver {
-	return func(startCh, stopCh chan<- Host) {
+func NewTestReceiverFunc(startFW, stopFW <-chan HostStatus) Receiver {
+	return func(startCh, stopCh chan<- HostStatus) {
 		for {
 			select {
 			case s := <-startFW:
@@ -124,8 +124,8 @@ func NewTestReceiverFunc(startFW, stopFW <-chan Host) Receiver {
 
 // NewTestNotifyFunc gets a channel and returns a function that
 // forwards whatever is put into the system's notify channel
-func NewTestNotifyFunc(notifyFw chan<- Host) Notifier {
-	return func(notify <-chan Host) {
+func NewTestNotifyFunc(notifyFw chan<- HostStatus) Notifier {
+	return func(notify <-chan HostStatus) {
 		for {
 			value := <-notify
 			notifyFw <- value
@@ -137,9 +137,9 @@ func NewTestNotifyFunc(notifyFw chan<- Host) Notifier {
 // function that when called will insert them as Host structs into the
 // start channel at boot time.
 func NewLoaderFunc(hosts []string) Loader {
-	return func(load chan<- Host) {
+	return func(load chan<- HostStatus) {
 		for _, host := range hosts {
-			load <- Host{host, false}
+			load <- HostStatus{host, false}
 		}
 	}
 }

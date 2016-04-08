@@ -9,6 +9,8 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 
+	"fmt"
+
 	"github.com/pinggg/pingd"
 )
 
@@ -30,7 +32,7 @@ const (
 // NewReceiverFunc returns the function that
 // listens of redis for start/stop commands
 func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
-	return func(startHostCh, stopHostCh chan<- pingd.Host) {
+	return func(startHostCh, stopHostCh chan<- pingd.HostStatus) {
 		conPubSub, err := redis.Dial("tcp", redisAddr)
 		if err != nil {
 			log.Panicln(err)
@@ -66,7 +68,7 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 					if err != nil {
 						log.Panicln(err)
 					}
-					startHostCh <- pingd.Host{Host: host, Down: down}
+					startHostCh <- pingd.HostStatus{Host: host, Down: down}
 
 				} else if n.Channel == stopRK {
 					host := string(n.Data)
@@ -76,7 +78,7 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 					if err != nil {
 						log.Panicln(err)
 					}
-					stopHostCh <- pingd.Host{Host: host}
+					stopHostCh <- pingd.HostStatus{Host: host}
 				}
 
 			case redis.PMessage:
@@ -93,7 +95,7 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 // NewNotifierFunc returns the function that
 // publishes on redis the up/down events
 func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
-	return func(notifyCh <-chan pingd.Host) {
+	return func(notifyCh <-chan pingd.HostStatus) {
 		conn, err := redis.Dial("tcp", redisAddr)
 		if err != nil {
 			log.Panicln(err)
@@ -110,7 +112,7 @@ func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
 			log.Panicln(err)
 		}
 
-		var h pingd.Host
+		var h pingd.HostStatus
 		for {
 			select {
 			case h = <-notifyCh:
@@ -118,7 +120,7 @@ func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
 				// DOWN
 				case true:
 					log.Println("DOWN " + h.Host)
-					conn.Send("PUBLISH", downRK, h.Host)
+					conn.Send("PUBLISH", downRK, fmt.Sprintf("%s %s", h.Host, h.Reason))
 					conn.Send("SET", "status-"+h.Host, downStatus)
 					conn.Flush()
 					// UP
@@ -137,7 +139,7 @@ func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
 // hosts and last statuses from REDIS in case of reboot
 // send them to the startHostCh channel
 func NewLoaderFunc(redisAddr string, redisDB int) pingd.Loader {
-	return func(startHostCh chan<- pingd.Host) {
+	return func(startHostCh chan<- pingd.HostStatus) {
 		log.Println("BOOT Loading hosts")
 		conn, err := redis.Dial("tcp", redisAddr)
 		if err != nil {
@@ -172,7 +174,7 @@ func NewLoaderFunc(redisAddr string, redisDB int) pingd.Loader {
 			}
 
 			// load into process
-			startHostCh <- pingd.Host{Host: host, Down: down}
+			startHostCh <- pingd.HostStatus{Host: host, Down: down}
 
 			// slow a bit loading process
 			time.Sleep(time.Millisecond * 10)

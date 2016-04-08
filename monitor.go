@@ -1,32 +1,34 @@
 package pingd
 
 import (
-	"log"
 	"sync"
 	"time"
 )
 
+// PingFunc is function signature for ping checks
 type PingFunc func(host string) (up bool, err error)
 
 // Monitor is the main structure that represent a monitored host
 // Whenever a host goes up or down it notifies it on the corresponding channel
 type Monitor struct {
+	running   *sync.Mutex // monitor must run only once
+	lock      *sync.Mutex // protects internal values
 	ping      PingFunc
-	host      Host
+	host      string
+	down      bool
 	failures  int
 	failLimit int
 	interval  time.Duration
 	stop      bool
-	notifyCh  chan<- Host
-	running   *sync.Mutex // monitor must run only once
-	lock      *sync.Mutex // protects internal values
+	notifyCh  chan<- HostStatus
 }
 
 // NewMonitor takes a host, an initial state, and the notification channels and returns a monitorable host structure
-func NewMonitor(host Host, ping PingFunc, notifyCh chan<- Host) *Monitor {
+func NewMonitor(status HostStatus, ping PingFunc, notifyCh chan<- HostStatus) *Monitor {
 	h := Monitor{
 		ping:     ping,
-		host:     host,
+		host:     status.Host,
+		down:     status.Down,
 		notifyCh: notifyCh,
 		running:  &sync.Mutex{},
 		lock:     &sync.Mutex{},
@@ -58,7 +60,7 @@ func (m *Monitor) Start(interval time.Duration, failLimit int) {
 		}
 		m.lock.Unlock()
 
-		if up, err := m.ping(m.host.Host); up {
+		if up, err := m.ping(m.host); up {
 			//			log.Println(m.host.Host + " pong")
 			m.markUp()
 		} else {
@@ -80,7 +82,7 @@ func (m *Monitor) Stop() {
 func (m *Monitor) markUp() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if !m.host.Down {
+	if !m.down {
 		m.failures = 0
 		return
 	}
@@ -90,8 +92,8 @@ func (m *Monitor) markUp() {
 		return
 	}
 
-	m.host.Down = false
-	m.notifyCh <- m.host
+	m.down = false
+	m.notifyCh <- HostStatus{Host: m.host, Down: m.down}
 }
 
 // markDown does nothing if the host is already down. If it's up, in increases the failure count
@@ -99,7 +101,7 @@ func (m *Monitor) markUp() {
 func (m *Monitor) markDown(err error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if m.host.Down {
+	if m.down {
 		m.failures = m.failLimit
 		return
 	}
@@ -109,10 +111,6 @@ func (m *Monitor) markDown(err error) {
 		return
 	}
 
-	if err != nil {
-		log.Println(err.Error())
-	}
-
-	m.host.Down = true
-	m.notifyCh <- m.host
+	m.down = true
+	m.notifyCh <- HostStatus{Host: m.host, Down: m.down, Reason: err}
 }

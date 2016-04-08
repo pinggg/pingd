@@ -14,7 +14,7 @@ type Mailer func(recepient string, message string)
 // NewNotifierFunc takes a email address and a email sending function
 // and will send emails with every up and down event.
 func NewNotifierFunc(recepient string, mailerFunc Mailer) pingd.Notifier {
-	return func(notify <-chan pingd.Host) {
+	return func(notify <-chan pingd.HostStatus) {
 		for {
 			host := <-notify
 			status := "UP"
