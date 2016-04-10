@@ -14,14 +14,17 @@ import (
 	"github.com/pinggg/pingd"
 )
 
+var (
+	HostListRK = "hostlist" // Redis key for host list
+	StartRK    = "start"    // Redis pubsub key for start
+	StopRK     = "stop"     // Redis pubsub key for stop
+	UpRK       = "up"       // Redis pubsub key for up notification
+	DownRK     = "down"     // Redis pubsub key for down notification
+)
+
 const (
-	hostListRK = "hostlist" // Redis key for host list
-	startRK    = "start"    // Redis pubsub key for start
-	stopRK     = "stop"     // Redis pubsub key for stop
-	upRK       = "up"       // Redis pubsub key for up notification
-	downRK     = "down"     // Redis pubsub key for down notification
-	upStatus   = "up"       // Status value for host up
-	downStatus = "down"     // Status value for host down
+	upStatus   = "up"   // Status value for host up
+	downStatus = "down" // Status value for host down
 
 	// when receiving host on the start channel
 	// they can be requested to start as "down"
@@ -50,12 +53,12 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 		connKV.Do("SELECT", redisDB)
 
 		psc := redis.PubSubConn{conPubSub}
-		psc.Subscribe(startRK, stopRK)
+		psc.Subscribe(StartRK, StopRK)
 
 		for {
 			switch n := psc.Receive().(type) {
 			case redis.Message:
-				if n.Channel == startRK {
+				if n.Channel == StartRK {
 					host := string(n.Data)
 					down := false
 					if strings.HasSuffix(host, downSuffix) {
@@ -64,17 +67,17 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 					}
 
 					// Add to the list of pinged hosts
-					_, err := connKV.Do("SADD", hostListRK, host)
+					_, err := connKV.Do("SADD", HostListRK, host)
 					if err != nil {
 						log.Panicln(err)
 					}
 					startHostCh <- pingd.HostStatus{Host: host, Down: down}
 
-				} else if n.Channel == stopRK {
+				} else if n.Channel == StopRK {
 					host := string(n.Data)
 
 					// Remove from the list of pinged hosts
-					_, err := connKV.Do("SREM", hostListRK, host)
+					_, err := connKV.Do("SREM", HostListRK, host)
 					if err != nil {
 						log.Panicln(err)
 					}
@@ -120,13 +123,13 @@ func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
 				// DOWN
 				case true:
 					log.Println("DOWN " + h.Host)
-					conn.Send("PUBLISH", downRK, fmt.Sprintf("%s %s", h.Host, h.Reason))
+					conn.Send("PUBLISH", DownRK, fmt.Sprintf("%s %s", h.Host, h.Reason))
 					conn.Send("SET", "status-"+h.Host, downStatus)
 					conn.Flush()
 					// UP
 				case false:
 					log.Println("UP " + h.Host)
-					conn.Send("PUBLISH", upRK, h.Host)
+					conn.Send("PUBLISH", UpRK, h.Host)
 					conn.Send("SET", "status-"+h.Host, upStatus)
 					conn.Flush()
 				}
@@ -156,7 +159,7 @@ func NewLoaderFunc(redisAddr string, redisDB int) pingd.Loader {
 			log.Panicln(err)
 		}
 
-		hosts, err := redis.Strings(conn.Do("SMEMBERS", hostListRK))
+		hosts, err := redis.Strings(conn.Do("SMEMBERS", HostListRK))
 		if err != nil {
 			log.Panicln(err)
 		}
