@@ -31,9 +31,9 @@ func main() {
 		Ping:      ping.Ping,
 		Interval:  interval,
 		FailLimit: failLimit,
-		Receive:   redis.NewReceiverFunc(redisAddr, redisDB),
-		Notify:    redis.NewNotifierFunc(redisAddr, redisDB),
-		Load:      redis.NewLoaderFunc(redisAddr, redisDB),
+		Receive:   redis.NewReceiverFunc(redisAddr, redisDB, "start", "stop", "hostlist"),
+		Notify:    redis.NewNotifierFunc(redisAddr, redisDB, "up", "down"),
+		Load:      redis.NewLoaderFunc(redisAddr, redisDB, "hostlist"),
 	}
 
 	pool.Start()

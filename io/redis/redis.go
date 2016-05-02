@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -9,17 +10,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 
-	"fmt"
-
 	"github.com/pinggg/pingd"
-)
-
-var (
-	HostListRK = "hostlist" // Redis key for host list
-	StartRK    = "start"    // Redis pubsub key for start
-	StopRK     = "stop"     // Redis pubsub key for stop
-	UpRK       = "up"       // Redis pubsub key for up notification
-	DownRK     = "down"     // Redis pubsub key for down notification
 )
 
 const (
@@ -34,7 +25,7 @@ const (
 
 // NewReceiverFunc returns the function that
 // listens of redis for start/stop commands
-func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
+func NewReceiverFunc(redisAddr string, redisDB int, startKey, stopKey, listKey string) pingd.Receiver {
 	return func(startHostCh, stopHostCh chan<- pingd.HostStatus) {
 		conPubSub, err := redis.Dial("tcp", redisAddr)
 		if err != nil {
@@ -53,12 +44,12 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 		connKV.Do("SELECT", redisDB)
 
 		psc := redis.PubSubConn{conPubSub}
-		psc.Subscribe(StartRK, StopRK)
+		psc.Subscribe(startKey, stopKey)
 
 		for {
 			switch n := psc.Receive().(type) {
 			case redis.Message:
-				if n.Channel == StartRK {
+				if n.Channel == startKey {
 					host := string(n.Data)
 					down := false
 					if strings.HasSuffix(host, downSuffix) {
@@ -67,17 +58,17 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 					}
 
 					// Add to the list of pinged hosts
-					_, err := connKV.Do("SADD", HostListRK, host)
+					_, err := connKV.Do("SADD", listKey, host)
 					if err != nil {
 						log.Panicln(err)
 					}
 					startHostCh <- pingd.HostStatus{Host: host, Down: down}
 
-				} else if n.Channel == StopRK {
+				} else if n.Channel == stopKey {
 					host := string(n.Data)
 
 					// Remove from the list of pinged hosts
-					_, err := connKV.Do("SREM", HostListRK, host)
+					_, err := connKV.Do("SREM", listKey, host)
 					if err != nil {
 						log.Panicln(err)
 					}
@@ -97,7 +88,7 @@ func NewReceiverFunc(redisAddr string, redisDB int) pingd.Receiver {
 
 // NewNotifierFunc returns the function that
 // publishes on redis the up/down events
-func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
+func NewNotifierFunc(redisAddr string, redisDB int, upKey, downKey string) pingd.Notifier {
 	return func(notifyCh <-chan pingd.HostStatus) {
 		conn, err := redis.Dial("tcp", redisAddr)
 		if err != nil {
@@ -123,13 +114,13 @@ func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
 				// DOWN
 				case true:
 					log.Println("DOWN " + h.Host)
-					conn.Send("PUBLISH", DownRK, fmt.Sprintf("%s %s", h.Host, h.Reason))
+					conn.Send("PUBLISH", downKey, fmt.Sprintf("%s %s", h.Host, h.Reason))
 					conn.Send("SET", "status-"+h.Host, downStatus)
 					conn.Flush()
 					// UP
 				case false:
 					log.Println("UP " + h.Host)
-					conn.Send("PUBLISH", UpRK, h.Host)
+					conn.Send("PUBLISH", upKey, h.Host)
 					conn.Send("SET", "status-"+h.Host, upStatus)
 					conn.Flush()
 				}
@@ -141,7 +132,7 @@ func NewNotifierFunc(redisAddr string, redisDB int) pingd.Notifier {
 // NewLoaderFunc returns the function that loads back
 // hosts and last statuses from REDIS in case of reboot
 // send them to the startHostCh channel
-func NewLoaderFunc(redisAddr string, redisDB int) pingd.Loader {
+func NewLoaderFunc(redisAddr string, redisDB int, listKey string) pingd.Loader {
 	return func(startHostCh chan<- pingd.HostStatus) {
 		log.Println("BOOT Loading hosts")
 		conn, err := redis.Dial("tcp", redisAddr)
@@ -159,7 +150,7 @@ func NewLoaderFunc(redisAddr string, redisDB int) pingd.Loader {
 			log.Panicln(err)
 		}
 
-		hosts, err := redis.Strings(conn.Do("SMEMBERS", HostListRK))
+		hosts, err := redis.Strings(conn.Do("SMEMBERS", listKey))
 		if err != nil {
 			log.Panicln(err)
 		}
